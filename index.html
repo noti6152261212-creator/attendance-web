@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>勤怠打刻</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 16px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    input {
+      width: 100%;
+      max-width: 260px;
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      margin-right: 8px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #message {
+      margin-top: 12px;
+      font-weight: bold;
+      min-height: 28px;
+    }
+
+    #statusBox,
+    #historyBox,
+    #allStatusBox {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    #historyList,
+    #allStatusList {
+      margin-top: 12px;
+      padding-left: 20px;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .status-not-started {
+      color: #555;
+    }
+
+    .status-working {
+      color: #0a6;
+      font-weight: bold;
+    }
+
+    .status-finished {
+      color: #06c;
+    }
+
+    .status-invalid {
+      color: #c00;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>勤怠打刻</h1>
+
+  <input id="employeeCode" placeholder="社員番号（例：001）" />
+  <br>
+
+  <button id="clockInBtn" onclick="clockIn()">出勤</button>
+  <button id="clockOutBtn" onclick="clockOut()">退勤</button>
+  <button onclick="loadHistory()">履歴表示</button>
+  <button onclick="loadAllStatus()">全員状況</button>
+
+  <p id="message"></p>
+
+  <div id="statusBox">
+    <strong>今日の状態：</strong>
+    <span id="todayStatus">社員番号を入力して履歴表示を押してください</span>
+  </div>
+
+  <div id="historyBox">
+    <h2>今日の履歴</h2>
+    <p class="muted">社員番号を入力して「履歴表示」を押してください</p>
+    <ul id="historyList"></ul>
+  </div>
+
+  <div id="allStatusBox">
+    <h2>全社員の今日の状況</h2>
+    <p class="muted">「全員状況」を押すと一覧表示します</p>
+    <ul id="allStatusList"></ul>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    const supabaseUrl = 'https://vybskqcqiaihfyxijshj.supabase.co'
+    const supabaseKey = 'sb_publishable_UBaM7CHhgTxjyWcKYbJ94g_Yc8WP9vH'
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const employeeCodeInput = document.getElementById('employeeCode')
+    const messageEl = document.getElementById('message')
+    const historyListEl = document.getElementById('historyList')
+    const allStatusListEl = document.getElementById('allStatusList')
+    const todayStatusEl = document.getElementById('todayStatus')
+    const clockInBtn = document.getElementById('clockInBtn')
+    const clockOutBtn = document.getElementById('clockOutBtn')
+
+    function formatJapanTime(dateString) {
+      const date = new Date(dateString)
+      return date.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+    }
+
+    async function getEmployee(code) {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('id, name, employee_code')
+        .eq('employee_code', code)
+        .single()
+
+      if (error) throw new Error('社員が見つかりません')
+      return data
+    }
+
+    async function saveLog(employeeId, type) {
+      const { error } = await supabase
+        .from('attendance_logs')
+        .insert([{ employee_id: employeeId, log_type: type }])
+
+      if (error) throw error
+    }
+
+    async function getTodayLogs(employeeId) {
+      const today = new Date()
+      const start = new Date(today)
+      start.setHours(0, 0, 0, 0)
+
+      const end = new Date(today)
+      end.setHours(23, 59, 59, 999)
+
+      const { data, error } = await supabase
+        .from('attendance_logs')
+        .select('log_type, logged_at')
+        .eq('employee_id', employeeId)
+        .gte('logged_at', start.toISOString())
+        .lte('logged_at', end.toISOString())
+        .order('logged_at', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    }
+
+    function getAttendanceState(logs) {
+      const clockInCount = logs.filter(log => log.log_type === 'clock_in').length
+      const clockOutCount = logs.filter(log => log.log_type === 'clock_out').length
+
+      if (clockInCount === 0 && clockOutCount === 0) return 'not_started'
+      if (clockInCount === 1 && clockOutCount === 0) return 'working'
+      if (clockInCount === 1 && clockOutCount === 1) return 'finished'
+      return 'invalid'
+    }
+
+    function getStateLabel(state) {
+      if (state === 'not_started') return '未出勤'
+      if (state === 'working') return '出勤中（退勤待ち）'
+      if (state === 'finished') return '本日の打刻完了'
+      if (state === 'invalid') return '打刻異常あり（管理者確認）'
+      return '状態不明'
+    }
+
+    function getStateClass(state) {
+      if (state === 'not_started') return 'status-not-started'
+      if (state === 'working') return 'status-working'
+      if (state === 'finished') return 'status-finished'
+      if (state === 'invalid') return 'status-invalid'
+      return ''
+    }
+
+    function updateButtonsByState(state) {
+      if (state === 'not_started') {
+        clockInBtn.disabled = false
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '未出勤'
+        return
+      }
+
+      if (state === 'working') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = false
+        todayStatusEl.textContent = '出勤中（退勤待ち）'
+        return
+      }
+
+      if (state === 'finished') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '本日の打刻完了'
+        return
+      }
+
+      if (state === 'invalid') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '打刻異常あり（管理者確認）'
+        return
+      }
+
+      clockInBtn.disabled = true
+      clockOutBtn.disabled = true
+      todayStatusEl.textContent = '打刻状態を確認してください'
+    }
+
+    async function renderHistory(employeeId) {
+      historyListEl.innerHTML = ''
+
+      const logs = await getTodayLogs(employeeId)
+
+      if (logs.length === 0) {
+        historyListEl.innerHTML = '<li>今日の履歴はありません</li>'
+      } else {
+        logs.forEach((log) => {
+          const li = document.createElement('li')
+          const label = log.log_type === 'clock_in' ? '出勤' : '退勤'
+          li.textContent = `${formatJapanTime(log.logged_at)}　${label}`
+          historyListEl.appendChild(li)
+        })
+      }
+
+      const state = getAttendanceState(logs)
+      updateButtonsByState(state)
+
+      return logs
+    }
+
+    async function refreshEmployeeStatus() {
+      const code = employeeCodeInput.value.trim()
+
+      if (!code) {
+        messageEl.innerText = '社員番号を入力してください'
+        todayStatusEl.textContent = '社員番号未入力'
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = true
+        historyListEl.innerHTML = ''
+        return null
+      }
+
+      const employee = await getEmployee(code)
+      await renderHistory(employee.id)
+      return employee
+    }
+
+    async function clockIn() {
+      try {
+        const employee = await refreshEmployeeStatus()
+        if (!employee) return
+
+        const logs = await getTodayLogs(employee.id)
+        const state = getAttendanceState(logs)
+
+        if (logs.some(log => log.log_type === 'clock_in')) {
+          messageEl.innerText = '今日はすでに出勤済みです'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state !== 'not_started') {
+          messageEl.innerText = '今日はすでに打刻が進んでいます'
+          updateButtonsByState(state)
+          return
+        }
+
+        await saveLog(employee.id, 'clock_in')
+        messageEl.innerText = `${employee.name}さんを出勤登録しました`
+        await renderHistory(employee.id)
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
+    }
+
+    async function clockOut() {
+      try {
+        const employee = await refreshEmployeeStatus()
+        if (!employee) return
+
+        const logs = await getTodayLogs(employee.id)
+        const state = getAttendanceState(logs)
+
+        if (state === 'not_started') {
+          messageEl.innerText = '先に出勤打刻をしてください'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state === 'finished') {
+          messageEl.innerText = '今日はすでに退勤まで完了しています'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state === 'invalid') {
+          messageEl.innerText = '打刻異常があるため管理者確認が必要です'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state !== 'working') {
+          messageEl.innerText = '打刻状態を確認してください'
+          updateButtonsByState(state)
+          return
+        }
+
+        await saveLog(employee.id, 'clock_out')
+        messageEl.innerText = `${employee.name}さんを退勤登録しました`
+        await renderHistory(employee.id)
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
+    }
+
+    async function loadHistory() {
+      try {
+        const employee = await refreshEmployeeStatus()
+        if (!employee) return
+        messageEl.innerText = `${employee.name}さんの今日の履歴を表示しています`
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
+    }
+
+    async function loadAllStatus() {
+      try {
+        messageEl.innerText = '全社員の状況を読み込み中です...'
+        allStatusListEl.innerHTML = '<li>読み込み中...</li>'
+
+        const { data: employees, error: empError } = await supabase
+          .from('employees')
+          .select('id, name, employee_code')
+
+        if (empError) throw empError
+
+        allStatusListEl.innerHTML = ''
+
+        if (!employees || employees.length === 0) {
+          allStatusListEl.innerHTML = '<li>社員データがありません</li>'
+          messageEl.innerText = '社員データがありません'
+          return
+        }
+
+        const sortedEmployees = [...employees].sort((a, b) =>
+          String(a.employee_code).localeCompare(String(b.employee_code), 'ja')
+        )
+
+        for (const emp of sortedEmployees) {
+          const logs = await getTodayLogs(emp.id)
+          const state = getAttendanceState(logs)
+
+          const li = document.createElement('li')
+          li.className = getStateClass(state)
+          li.textContent = `${emp.employee_code} ${emp.name}　→　${getStateLabel(state)}`
+          allStatusListEl.appendChild(li)
+        }
+
+        messageEl.innerText = `全社員の今日の状況を表示しています（${sortedEmployees.length}名）`
+      } catch (e) {
+        allStatusListEl.innerHTML = `<li>エラー: ${e.message}</li>`
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
+    employeeCodeInput.addEventListener('input', () => {
+      messageEl.innerText = ''
+      todayStatusEl.textContent = '社員番号を入力して履歴表示を押してください'
+      clockInBtn.disabled = false
+      clockOutBtn.disabled = false
+    })
+
+    window.clockIn = clockIn
+    window.clockOut = clockOut
+    window.loadHistory = loadHistory
+    window.loadAllStatus = loadAllStatus
+  </script>
+</body>
+</html>
