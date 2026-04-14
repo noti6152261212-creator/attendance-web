@@ -23,10 +23,8 @@
       margin-bottom: 12px;
       box-sizing: border-box;
     }
-    textarea {
-      min-height: 90px;
-      resize: vertical;
-    }
+    textarea { min-height: 90px; resize: vertical; }
+
     button {
       padding: 10px 16px;
       font-size: 16px;
@@ -46,14 +44,12 @@
       border-radius: 8px;
       background: #fafafa;
     }
-
     .row {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       align-items: flex-start;
     }
-
     .field {
       display: flex;
       flex-direction: column;
@@ -107,12 +103,10 @@
       margin-left: 8px;
       background: #eee;
     }
-
     .badge-active {
       background: #dff5e8;
       color: #136f3a;
     }
-
     .badge-inactive {
       background: #f7dfdf;
       color: #8a1c1c;
@@ -192,7 +186,7 @@
 
   <div class="section">
     <h2>社員管理</h2>
-    <p class="muted">新規登録、変更、無効化、再有効化ができます</p>
+    <p class="muted">新規登録、変更、無効化、再有効化、履歴なし社員の削除ができます</p>
 
     <div class="row">
       <div class="field">
@@ -299,6 +293,16 @@
 
       if (error) throw error
       return data || []
+    }
+
+    async function hasEmployeeHistory(employeeId) {
+      const { count, error } = await supabase
+        .from('attendance_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('employee_id', employeeId)
+
+      if (error) throw error
+      return (count || 0) > 0
     }
 
     function getAttendanceState(logs) {
@@ -530,17 +534,15 @@
 
         const employee = await getEmployee(code)
 
-        const payload = {
-          employee_id: employee.id,
-          target_date: targetDate,
-          requested_clock_in: requestedClockIn || null,
-          requested_clock_out: requestedClockOut || null,
-          reason: reason
-        }
-
         const { error } = await supabase
           .from('correction_requests')
-          .insert([payload])
+          .insert([{
+            employee_id: employee.id,
+            target_date: targetDate,
+            requested_clock_in: requestedClockIn || null,
+            requested_clock_out: requestedClockOut || null,
+            reason: reason
+          }])
 
         if (error) throw error
 
@@ -593,9 +595,7 @@
           card.className = 'request-card'
 
           const emp = Array.isArray(req.employees) ? req.employees[0] : req.employees
-          const employeeLabel = emp
-            ? `${emp.employee_code} ${emp.name}`
-            : '社員情報なし'
+          const employeeLabel = emp ? `${emp.employee_code} ${emp.name}` : '社員情報なし'
 
           card.innerHTML = `
             <div><strong>申請者：</strong>${employeeLabel}</div>
@@ -779,7 +779,9 @@
           return
         }
 
-        data.forEach((emp) => {
+        for (const emp of data) {
+          const hasHistory = await hasEmployeeHistory(emp.id)
+
           const card = document.createElement('div')
           card.className = 'employee-card' + (emp.is_active === false ? ' employee-inactive' : '')
 
@@ -793,6 +795,7 @@
             </div>
             <div>部門：${emp.department}</div>
             <div>役割：${emp.role}</div>
+            <div>履歴：${hasHistory ? 'あり' : 'なし'}</div>
             <div class="employee-actions">
               <button onclick="editEmployee('${emp.id}', '${String(emp.employee_code).replace(/'/g, "\\'")}', '${String(emp.name).replace(/'/g, "\\'")}', '${String(emp.department).replace(/'/g, "\\'")}', '${emp.role}')">編集</button>
               ${
@@ -800,12 +803,17 @@
                   ? `<button onclick="reactivateEmployee('${emp.id}')">再有効化</button>`
                   : `<button onclick="deactivateEmployee('${emp.id}')">無効化</button>`
               }
+              ${
+                hasHistory
+                  ? `<button disabled title="勤怠履歴があるため削除できません">削除不可</button>`
+                  : `<button onclick="deleteEmployee('${emp.id}')">削除</button>`
+              }
             </div>
           `
           employeeListEl.appendChild(card)
-        })
+        }
 
-        messageEl.innerText = `社員一覧を表示しています（${data.length}名）`
+        messageEl.innerText = `社員一覧を表示しています`
       } catch (e) {
         employeeListEl.innerHTML = `<div class="employee-card">エラー: ${e.message}</div>`
         messageEl.innerText = `エラー: ${e.message}`
@@ -859,6 +867,32 @@
       }
     }
 
+    async function deleteEmployee(id) {
+      try {
+        const historyExists = await hasEmployeeHistory(id)
+        if (historyExists) {
+          alert('この社員には勤怠履歴があるため削除できません。無効化を使ってください。')
+          return
+        }
+
+        const ok = confirm('この社員を削除します。よろしいですか？')
+        if (!ok) return
+
+        const { error } = await supabase
+          .from('employees')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+
+        messageEl.innerText = '社員を削除しました'
+        await loadEmployees()
+        await loadAllStatus()
+      } catch (e) {
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
     employeeCodeInput.addEventListener('input', () => {
       messageEl.innerText = ''
       todayStatusEl.textContent = '社員番号を入力して履歴表示を押してください'
@@ -879,6 +913,7 @@
     window.editEmployee = editEmployee
     window.deactivateEmployee = deactivateEmployee
     window.reactivateEmployee = reactivateEmployee
+    window.deleteEmployee = deleteEmployee
     window.resetEmployeeForm = resetEmployeeForm
   </script>
 </body>
