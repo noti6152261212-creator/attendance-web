@@ -7,16 +7,15 @@
   <style>
     body {
       font-family: sans-serif;
-      max-width: 980px;
+      max-width: 1100px;
       margin: 40px auto;
       padding: 16px;
       line-height: 1.6;
     }
-
     h1 { margin-bottom: 24px; }
     h2 { margin-top: 0; }
 
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       max-width: 320px;
       padding: 10px;
@@ -24,12 +23,10 @@
       margin-bottom: 12px;
       box-sizing: border-box;
     }
-
     textarea {
       min-height: 90px;
       resize: vertical;
     }
-
     button {
       padding: 10px 16px;
       font-size: 16px;
@@ -37,7 +34,6 @@
       margin-bottom: 12px;
       cursor: pointer;
     }
-
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
@@ -62,7 +58,6 @@
       display: flex;
       flex-direction: column;
     }
-
     .field label {
       font-weight: bold;
       margin-bottom: 6px;
@@ -74,8 +69,7 @@
       min-height: 28px;
     }
 
-    #historyList,
-    #allStatusList {
+    #historyList, #allStatusList {
       margin-top: 12px;
       padding-left: 20px;
     }
@@ -86,7 +80,8 @@
     .status-finished { color: #06c; }
     .status-invalid { color: #c00; font-weight: bold; }
 
-    .request-card {
+    .request-card,
+    .employee-card {
       border: 1px solid #ddd;
       border-radius: 8px;
       padding: 12px;
@@ -94,8 +89,33 @@
       background: #fff;
     }
 
-    .request-actions {
+    .request-actions,
+    .employee-actions {
       margin-top: 10px;
+    }
+
+    .employee-inactive {
+      opacity: 0.65;
+      background: #f3f3f3;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      margin-left: 8px;
+      background: #eee;
+    }
+
+    .badge-active {
+      background: #dff5e8;
+      color: #136f3a;
+    }
+
+    .badge-inactive {
+      background: #f7dfdf;
+      color: #8a1c1c;
     }
   </style>
 </head>
@@ -170,6 +190,41 @@
     <div id="requestList"></div>
   </div>
 
+  <div class="section">
+    <h2>社員管理</h2>
+    <p class="muted">新規登録、変更、無効化、再有効化ができます</p>
+
+    <div class="row">
+      <div class="field">
+        <label for="manageEmployeeCode">社員番号</label>
+        <input id="manageEmployeeCode" placeholder="例：002" />
+      </div>
+      <div class="field">
+        <label for="manageEmployeeName">名前</label>
+        <input id="manageEmployeeName" placeholder="例：山田太郎" />
+      </div>
+      <div class="field">
+        <label for="manageEmployeeDepartment">部門</label>
+        <input id="manageEmployeeDepartment" placeholder="例：製造" />
+      </div>
+      <div class="field">
+        <label for="manageEmployeeRole">役割</label>
+        <select id="manageEmployeeRole">
+          <option value="employee">employee</option>
+          <option value="manager">manager</option>
+        </select>
+      </div>
+    </div>
+
+    <input type="hidden" id="editingEmployeeId" />
+
+    <button onclick="saveEmployee()">社員登録 / 更新</button>
+    <button onclick="resetEmployeeForm()">入力リセット</button>
+    <button onclick="loadEmployees()">社員一覧を読み込み</button>
+
+    <div id="employeeList"></div>
+  </div>
+
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
     import { SUPABASE_URL, SUPABASE_KEY } from './supabase-config.js'
@@ -184,6 +239,7 @@
     const clockInBtn = document.getElementById('clockInBtn')
     const clockOutBtn = document.getElementById('clockOutBtn')
     const requestListEl = document.getElementById('requestList')
+    const employeeListEl = document.getElementById('employeeList')
 
     function formatJapanTime(dateString) {
       const date = new Date(dateString)
@@ -208,11 +264,12 @@
     async function getEmployee(code) {
       const { data, error } = await supabase
         .from('employees')
-        .select('id, name, employee_code')
+        .select('id, name, employee_code, is_active')
         .eq('employee_code', code)
         .single()
 
       if (error) throw new Error('社員が見つかりません')
+      if (!data.is_active) throw new Error('この社員は無効化されています')
       return data
     }
 
@@ -277,28 +334,24 @@
         todayStatusEl.textContent = '未出勤'
         return
       }
-
       if (state === 'working') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = false
         todayStatusEl.textContent = '出勤中（退勤待ち）'
         return
       }
-
       if (state === 'finished') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = true
         todayStatusEl.textContent = '本日の打刻完了'
         return
       }
-
       if (state === 'invalid') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = true
         todayStatusEl.textContent = '打刻異常あり（管理者確認）'
         return
       }
-
       clockInBtn.disabled = true
       clockOutBtn.disabled = true
       todayStatusEl.textContent = '打刻状態を確認してください'
@@ -306,7 +359,6 @@
 
     async function renderHistory(employeeId) {
       historyListEl.innerHTML = ''
-
       const logs = await getTodayLogs(employeeId)
 
       if (logs.length === 0) {
@@ -322,7 +374,6 @@
 
       const state = getAttendanceState(logs)
       updateButtonsByState(state)
-
       return logs
     }
 
@@ -428,7 +479,7 @@
 
         const { data: employees, error: empError } = await supabase
           .from('employees')
-          .select('id, name, employee_code')
+          .select('id, name, employee_code, is_active')
 
         if (empError) throw empError
 
@@ -440,7 +491,8 @@
           return
         }
 
-        const sortedEmployees = [...employees].sort((a, b) =>
+        const activeEmployees = employees.filter(emp => emp.is_active !== false)
+        const sortedEmployees = [...activeEmployees].sort((a, b) =>
           String(a.employee_code).localeCompare(String(b.employee_code), 'ja')
         )
 
@@ -486,12 +538,9 @@
           reason: reason
         }
 
-        console.log('修正申請 payload:', payload)
-
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('correction_requests')
           .insert([payload])
-          .select()
 
         if (error) throw error
 
@@ -502,12 +551,10 @@
 
         messageEl.innerText = `${employee.name}さんの修正申請を送信しました`
         alert(`${employee.name}さんの修正申請を送信しました`)
-        console.log('修正申請 success:', data)
       } catch (e) {
         const msg = `修正申請エラー: ${e.message || e}`
         messageEl.innerText = msg
         alert(msg)
-        console.error(msg, e)
       }
     }
 
@@ -658,6 +705,160 @@
       }
     }
 
+    function resetEmployeeForm() {
+      document.getElementById('editingEmployeeId').value = ''
+      document.getElementById('manageEmployeeCode').value = ''
+      document.getElementById('manageEmployeeName').value = ''
+      document.getElementById('manageEmployeeDepartment').value = ''
+      document.getElementById('manageEmployeeRole').value = 'employee'
+    }
+
+    async function saveEmployee() {
+      try {
+        const editingId = document.getElementById('editingEmployeeId').value
+        const employeeCode = document.getElementById('manageEmployeeCode').value.trim()
+        const name = document.getElementById('manageEmployeeName').value.trim()
+        const department = document.getElementById('manageEmployeeDepartment').value.trim()
+        const role = document.getElementById('manageEmployeeRole').value
+
+        if (!employeeCode) throw new Error('社員番号を入力してください')
+        if (!name) throw new Error('名前を入力してください')
+        if (!department) throw new Error('部門を入力してください')
+        if (!role) throw new Error('役割を選択してください')
+
+        if (editingId) {
+          const { error } = await supabase
+            .from('employees')
+            .update({
+              employee_code: employeeCode,
+              name,
+              department,
+              role
+            })
+            .eq('id', editingId)
+
+          if (error) throw error
+          messageEl.innerText = '社員情報を更新しました'
+        } else {
+          const { error } = await supabase
+            .from('employees')
+            .insert([{
+              employee_code: employeeCode,
+              name,
+              department,
+              role,
+              is_active: true
+            }])
+
+          if (error) throw error
+          messageEl.innerText = '社員を登録しました'
+        }
+
+        resetEmployeeForm()
+        await loadEmployees()
+      } catch (e) {
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
+    async function loadEmployees() {
+      try {
+        employeeListEl.innerHTML = '<div class="employee-card">読み込み中...</div>'
+
+        const { data, error } = await supabase
+          .from('employees')
+          .select('id, employee_code, name, department, role, is_active')
+          .order('employee_code', { ascending: true })
+
+        if (error) throw error
+
+        employeeListEl.innerHTML = ''
+
+        if (!data || data.length === 0) {
+          employeeListEl.innerHTML = '<div class="employee-card">社員データがありません</div>'
+          return
+        }
+
+        data.forEach((emp) => {
+          const card = document.createElement('div')
+          card.className = 'employee-card' + (emp.is_active === false ? ' employee-inactive' : '')
+
+          const badgeClass = emp.is_active === false ? 'badge badge-inactive' : 'badge badge-active'
+          const badgeText = emp.is_active === false ? '無効' : '有効'
+
+          card.innerHTML = `
+            <div>
+              <strong>${emp.employee_code} ${emp.name}</strong>
+              <span class="${badgeClass}">${badgeText}</span>
+            </div>
+            <div>部門：${emp.department}</div>
+            <div>役割：${emp.role}</div>
+            <div class="employee-actions">
+              <button onclick="editEmployee('${emp.id}', '${String(emp.employee_code).replace(/'/g, "\\'")}', '${String(emp.name).replace(/'/g, "\\'")}', '${String(emp.department).replace(/'/g, "\\'")}', '${emp.role}')">編集</button>
+              ${
+                emp.is_active === false
+                  ? `<button onclick="reactivateEmployee('${emp.id}')">再有効化</button>`
+                  : `<button onclick="deactivateEmployee('${emp.id}')">無効化</button>`
+              }
+            </div>
+          `
+          employeeListEl.appendChild(card)
+        })
+
+        messageEl.innerText = `社員一覧を表示しています（${data.length}名）`
+      } catch (e) {
+        employeeListEl.innerHTML = `<div class="employee-card">エラー: ${e.message}</div>`
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
+    function editEmployee(id, code, name, department, role) {
+      document.getElementById('editingEmployeeId').value = id
+      document.getElementById('manageEmployeeCode').value = code
+      document.getElementById('manageEmployeeName').value = name
+      document.getElementById('manageEmployeeDepartment').value = department
+      document.getElementById('manageEmployeeRole').value = role
+      messageEl.innerText = '社員情報を編集中です'
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }
+
+    async function deactivateEmployee(id) {
+      try {
+        const ok = confirm('この社員を無効化します。よろしいですか？')
+        if (!ok) return
+
+        const { error } = await supabase
+          .from('employees')
+          .update({ is_active: false })
+          .eq('id', id)
+
+        if (error) throw error
+
+        messageEl.innerText = '社員を無効化しました'
+        await loadEmployees()
+        await loadAllStatus()
+      } catch (e) {
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
+    async function reactivateEmployee(id) {
+      try {
+        const { error } = await supabase
+          .from('employees')
+          .update({ is_active: true })
+          .eq('id', id)
+
+        if (error) throw error
+
+        messageEl.innerText = '社員を再有効化しました'
+        await loadEmployees()
+        await loadAllStatus()
+      } catch (e) {
+        messageEl.innerText = `エラー: ${e.message}`
+      }
+    }
+
     employeeCodeInput.addEventListener('input', () => {
       messageEl.innerText = ''
       todayStatusEl.textContent = '社員番号を入力して履歴表示を押してください'
@@ -673,6 +874,12 @@
     window.loadCorrectionRequests = loadCorrectionRequests
     window.approveCorrectionRequest = approveCorrectionRequest
     window.rejectCorrectionRequest = rejectCorrectionRequest
+    window.saveEmployee = saveEmployee
+    window.loadEmployees = loadEmployees
+    window.editEmployee = editEmployee
+    window.deactivateEmployee = deactivateEmployee
+    window.reactivateEmployee = reactivateEmployee
+    window.resetEmployeeForm = resetEmployeeForm
   </script>
 </body>
 </html>
