@@ -12,8 +12,10 @@
       padding: 16px;
       line-height: 1.6;
     }
+
     h1 { margin-bottom: 24px; }
     h2 { margin-top: 0; }
+
     input, textarea {
       width: 100%;
       max-width: 320px;
@@ -22,7 +24,12 @@
       margin-bottom: 12px;
       box-sizing: border-box;
     }
-    textarea { min-height: 90px; resize: vertical; }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
     button {
       padding: 10px 16px;
       font-size: 16px;
@@ -30,7 +37,12 @@
       margin-bottom: 12px;
       cursor: pointer;
     }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .section {
       margin-top: 24px;
       padding: 16px;
@@ -38,21 +50,42 @@
       border-radius: 8px;
       background: #fafafa;
     }
+
     .row {
       display: flex;
       gap: 12px;
       flex-wrap: wrap;
       align-items: flex-start;
     }
-    .field { display: flex; flex-direction: column; }
-    .field label { font-weight: bold; margin-bottom: 6px; }
-    #message { margin-top: 12px; font-weight: bold; min-height: 28px; }
-    #historyList, #allStatusList { margin-top: 12px; padding-left: 20px; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field label {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    #message {
+      margin-top: 12px;
+      font-weight: bold;
+      min-height: 28px;
+    }
+
+    #historyList,
+    #allStatusList {
+      margin-top: 12px;
+      padding-left: 20px;
+    }
+
     .muted { color: #666; font-size: 14px; }
     .status-not-started { color: #555; }
     .status-working { color: #0a6; font-weight: bold; }
     .status-finished { color: #06c; }
     .status-invalid { color: #c00; font-weight: bold; }
+
     .request-card {
       border: 1px solid #ddd;
       border-radius: 8px;
@@ -60,7 +93,10 @@
       margin-top: 12px;
       background: #fff;
     }
-    .request-actions { margin-top: 10px; }
+
+    .request-actions {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -241,24 +277,28 @@
         todayStatusEl.textContent = '未出勤'
         return
       }
+
       if (state === 'working') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = false
         todayStatusEl.textContent = '出勤中（退勤待ち）'
         return
       }
+
       if (state === 'finished') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = true
         todayStatusEl.textContent = '本日の打刻完了'
         return
       }
+
       if (state === 'invalid') {
         clockInBtn.disabled = true
         clockOutBtn.disabled = true
         todayStatusEl.textContent = '打刻異常あり（管理者確認）'
         return
       }
+
       clockInBtn.disabled = true
       clockOutBtn.disabled = true
       todayStatusEl.textContent = '打刻状態を確認してください'
@@ -266,6 +306,7 @@
 
     async function renderHistory(employeeId) {
       historyListEl.innerHTML = ''
+
       const logs = await getTodayLogs(employeeId)
 
       if (logs.length === 0) {
@@ -281,6 +322,7 @@
 
       const state = getAttendanceState(logs)
       updateButtonsByState(state)
+
       return logs
     }
 
@@ -436,15 +478,20 @@
 
         const employee = await getEmployee(code)
 
-        const { error } = await supabase
+        const payload = {
+          employee_id: employee.id,
+          target_date: targetDate,
+          requested_clock_in: requestedClockIn || null,
+          requested_clock_out: requestedClockOut || null,
+          reason: reason
+        }
+
+        console.log('修正申請 payload:', payload)
+
+        const { data, error } = await supabase
           .from('correction_requests')
-          .insert([{
-            employee_id: employee.id,
-            target_date: targetDate,
-            requested_clock_in: requestedClockIn || null,
-            requested_clock_out: requestedClockOut || null,
-            reason: reason
-          }])
+          .insert([payload])
+          .select()
 
         if (error) throw error
 
@@ -454,8 +501,13 @@
         document.getElementById('requestReason').value = ''
 
         messageEl.innerText = `${employee.name}さんの修正申請を送信しました`
+        alert(`${employee.name}さんの修正申請を送信しました`)
+        console.log('修正申請 success:', data)
       } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
+        const msg = `修正申請エラー: ${e.message || e}`
+        messageEl.innerText = msg
+        alert(msg)
+        console.error(msg, e)
       }
     }
 
