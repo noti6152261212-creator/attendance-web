@@ -5,202 +5,223 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>勤怠打刻</title>
   <style>
-    body { font-family: sans-serif; max-width: 1100px; margin: 40px auto; padding: 16px; line-height: 1.6; }
-    h1 { margin-bottom: 24px; } h2 { margin-top: 0; }
-    input, textarea, select { width: 100%; max-width: 320px; padding: 10px; font-size: 16px; margin-bottom: 12px; box-sizing: border-box; }
-    textarea { min-height: 90px; resize: vertical; }
-    button { padding: 10px 16px; font-size: 16px; margin-right: 8px; margin-bottom: 12px; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .section { margin-top: 24px; padding: 16px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
-    .field { display: flex; flex-direction: column; }
-    .field label { font-weight: bold; margin-bottom: 6px; }
-    #message { margin-top: 12px; font-weight: bold; min-height: 28px; }
-    #historyList, #allStatusList { margin-top: 12px; padding-left: 20px; }
-    .muted { color: #666; font-size: 14px; }
-    .status-not-started { color: #555; }
-    .status-working { color: #0a6; font-weight: bold; }
-    .status-finished { color: #06c; }
-    .status-invalid { color: #c00; font-weight: bold; }
-    .request-card, .employee-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 12px; background: #fff; }
-    .request-actions, .employee-actions { margin-top: 10px; }
-    .employee-inactive { opacity: 0.65; background: #f3f3f3; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; margin-left: 8px; background: #eee; }
-    .badge-active { background: #dff5e8; color: #136f3a; }
-    .badge-inactive { background: #f7dfdf; color: #8a1c1c; }
-    .hidden { display: none !important; }
-    .role-banner { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #eef5ff; border: 1px solid #c9ddff; font-size: 14px; }
+    body {
+      font-family: sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 16px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    input {
+      width: 100%;
+      max-width: 260px;
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      margin-right: 8px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #message {
+      margin-top: 12px;
+      font-weight: bold;
+      min-height: 28px;
+    }
+
+    #statusBox,
+    #historyBox,
+    #allStatusBox {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    #historyList,
+    #allStatusList {
+      margin-top: 12px;
+      padding-left: 20px;
+    }
+
+    .muted {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .status-not-started {
+      color: #555;
+    }
+
+    .status-working {
+      color: #0a6;
+      font-weight: bold;
+    }
+
+    .status-finished {
+      color: #06c;
+    }
+
+    .status-invalid {
+      color: #c00;
+      font-weight: bold;
+    }
+
+    .admin-only {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h1>勤怠打刻</h1>
 
-  <div class="section">
-    <div class="field">
-      <label for="employeeCode">社員番号</label>
-      <input id="employeeCode" placeholder="社員番号（例：001）" />
-    </div>
+  <input id="employeeCode" placeholder="社員番号（例：001）" />
+  <br>
 
-    <button onclick="applyRoleView()">権限読込</button>
-    <button id="clockInBtn" onclick="clockIn()">出勤</button>
-    <button id="clockOutBtn" onclick="clockOut()">退勤</button>
-    <button onclick="loadHistory()">履歴表示</button>
-    <button id="allStatusBtn" onclick="loadAllStatus()">全員状況</button>
+  <button id="clockInBtn" onclick="clockIn()">出勤</button>
+  <button id="clockOutBtn" onclick="clockOut()">退勤</button>
+  <button id="historyBtn" onclick="loadHistory()">履歴表示</button>
+  <button id="allStatusBtn" class="admin-only" onclick="loadAllStatus()">全員状況</button>
 
-    <div id="roleBanner" class="role-banner">社員番号を入力して「権限読込」を押してください</div>
-    <p id="message"></p>
-  </div>
+  <p id="message"></p>
 
-  <div class="section">
+  <div id="statusBox">
     <strong>今日の状態：</strong>
     <span id="todayStatus">社員番号を入力して履歴表示を押してください</span>
   </div>
 
-  <div class="section">
+  <div id="historyBox">
     <h2>今日の履歴</h2>
     <p class="muted">社員番号を入力して「履歴表示」を押してください</p>
     <ul id="historyList"></ul>
   </div>
 
-  <div id="allStatusSection" class="section hidden">
+  <div id="allStatusBox">
     <h2>全社員の今日の状況</h2>
-    <p class="muted">managerは全社員、leaderは自部署のみ表示します</p>
+    <p class="muted" id="allStatusGuide">管理者ログイン時のみ表示できます</p>
     <ul id="allStatusList"></ul>
-  </div>
-
-  <div id="monthlySection" class="section hidden">
-    <h2>月次一覧</h2>
-    <p class="muted">休憩1時間を自動控除して集計します。managerは全社員、leaderは自部署のみ表示します</p>
-    <input type="month" id="monthPicker" />
-    <button onclick="loadMonthly()">月次一覧表示</button>
-    <div id="monthlyList"></div>
-  </div>
-
-  <div class="section">
-    <h2>修正申請</h2>
-    <p class="muted">打刻漏れや誤打刻があった場合に申請します</p>
-
-    <div class="row">
-      <div class="field">
-        <label for="requestDate">対象日</label>
-        <input id="requestDate" type="date" />
-      </div>
-
-      <div class="field">
-        <label for="requestClockIn">修正後 出勤時刻</label>
-        <input id="requestClockIn" type="time" />
-      </div>
-
-      <div class="field">
-        <label for="requestClockOut">修正後 退勤時刻</label>
-        <input id="requestClockOut" type="time" />
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="requestReason">理由</label>
-      <textarea id="requestReason" placeholder="例：出勤打刻を忘れました"></textarea>
-    </div>
-
-    <button onclick="submitCorrectionRequest()">修正申請を送信</button>
-  </div>
-
-  <div id="requestSection" class="section hidden">
-    <h2>修正申請一覧（承認用）</h2>
-    <p class="muted">managerは全社員、leaderは自部署のみ承認できます</p>
-    <button onclick="loadCorrectionRequests()">修正申請一覧を読み込み</button>
-    <div id="requestList"></div>
-  </div>
-
-  <div id="employeeSection" class="section hidden">
-    <h2>社員管理</h2>
-    <p class="muted">managerのみ利用できます。新規登録、変更、無効化、再有効化、履歴なし社員の削除ができます</p>
-
-    <div class="row">
-      <div class="field">
-        <label for="manageEmployeeCode">社員番号</label>
-        <input id="manageEmployeeCode" placeholder="例：002" />
-      </div>
-      <div class="field">
-        <label for="manageEmployeeName">名前</label>
-        <input id="manageEmployeeName" placeholder="例：山田太郎" />
-      </div>
-      <div class="field">
-        <label for="manageEmployeeDepartment">部門</label>
-        <input id="manageEmployeeDepartment" placeholder="例：製造" />
-      </div>
-      <div class="field">
-        <label for="manageEmployeeRole">役割</label>
-        <select id="manageEmployeeRole">
-          <option value="employee">employee</option>
-          <option value="leader">leader</option>
-          <option value="manager">manager</option>
-        </select>
-      </div>
-    </div>
-
-    <input type="hidden" id="editingEmployeeId" />
-    <button onclick="saveEmployee()">社員登録 / 更新</button>
-    <button onclick="resetEmployeeForm()">入力リセット</button>
-    <button onclick="loadEmployees()">社員一覧を読み込み</button>
-    <div id="employeeList"></div>
   </div>
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    import { SUPABASE_URL, SUPABASE_KEY } from './supabase-config.js'
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const supabaseUrl = 'https://vybskqcqiaihfyxijshj.supabase.co'
+    const supabaseKey = 'sb_publishable_UBaM7CHhgTxjyWcKYbJ94g_Yc8WP9vH'
+
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     const employeeCodeInput = document.getElementById('employeeCode')
     const messageEl = document.getElementById('message')
     const historyListEl = document.getElementById('historyList')
     const allStatusListEl = document.getElementById('allStatusList')
+    const allStatusGuideEl = document.getElementById('allStatusGuide')
     const todayStatusEl = document.getElementById('todayStatus')
     const clockInBtn = document.getElementById('clockInBtn')
     const clockOutBtn = document.getElementById('clockOutBtn')
-    const requestListEl = document.getElementById('requestList')
-    const employeeListEl = document.getElementById('employeeList')
-    const roleBannerEl = document.getElementById('roleBanner')
+    const allStatusBtn = document.getElementById('allStatusBtn')
 
-    let currentUser = null
+    let isAdminUser = false
+
+    async function checkAdminUI() {
+      try {
+        const {
+          data: { user },
+          error: userError
+        } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          isAdminUser = false
+          allStatusBtn.style.display = 'none'
+          allStatusGuideEl.textContent = '管理者ログイン時のみ表示できます'
+          return
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError || !profile) {
+          isAdminUser = false
+          allStatusBtn.style.display = 'none'
+          allStatusGuideEl.textContent = '管理者ログイン時のみ表示できます'
+          return
+        }
+
+        if (profile.role === 'admin' || profile.role === '管理者') {
+          isAdminUser = true
+          allStatusBtn.style.display = 'inline-block'
+          allStatusGuideEl.textContent = '「全員状況」を押すと一覧表示します'
+        } else {
+          isAdminUser = false
+          allStatusBtn.style.display = 'none'
+          allStatusGuideEl.textContent = '管理者ログイン時のみ表示できます'
+        }
+      } catch (e) {
+        isAdminUser = false
+        allStatusBtn.style.display = 'none'
+        allStatusGuideEl.textContent = '管理者ログイン時のみ表示できます'
+      }
+    }
 
     function formatJapanTime(dateString) {
       const date = new Date(dateString)
-      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false })
+      return date.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
     }
-
-    function toJstDateRange(targetDate) {
-      return { start: `${targetDate}T00:00:00+09:00`, end: `${targetDate}T23:59:59+09:00` }
-    }
-
-    function toJstDateTime(targetDate, targetTime) {
-      return `${targetDate}T${targetTime}:00+09:00`
-    }
-
-    function isManager() { return currentUser?.role === 'manager' }
-    function isLeader() { return currentUser?.role === 'leader' }
-    function canApprove() { return isManager() || isLeader() }
 
     async function getEmployee(code) {
       const { data, error } = await supabase
         .from('employees')
-        .select('id, name, employee_code, is_active, role, department')
+        .select('id, name, employee_code')
         .eq('employee_code', code)
         .single()
+
       if (error) throw new Error('社員が見つかりません')
-      if (!data.is_active) throw new Error('この社員は無効化されています')
       return data
     }
 
     async function saveLog(employeeId, type) {
-      const { error } = await supabase.from('attendance_logs').insert([{ employee_id: employeeId, log_type: type }])
+      const { error } = await supabase
+        .from('attendance_logs')
+        .insert([{ employee_id: employeeId, log_type: type }])
+
       if (error) throw error
     }
 
     async function getTodayLogs(employeeId) {
       const today = new Date()
-      const start = new Date(today); start.setHours(0, 0, 0, 0)
-      const end = new Date(today); end.setHours(23, 59, 59, 999)
+      const start = new Date(today)
+      start.setHours(0, 0, 0, 0)
+
+      const end = new Date(today)
+      end.setHours(23, 59, 59, 999)
+
       const { data, error } = await supabase
         .from('attendance_logs')
         .select('log_type, logged_at')
@@ -208,25 +229,18 @@
         .gte('logged_at', start.toISOString())
         .lte('logged_at', end.toISOString())
         .order('logged_at', { ascending: true })
+
       if (error) throw error
       return data || []
     }
 
-    async function hasEmployeeHistory(employeeId) {
-      const { count, error } = await supabase
-        .from('attendance_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('employee_id', employeeId)
-      if (error) throw error
-      return (count || 0) > 0
-    }
-
     function getAttendanceState(logs) {
-      const inCount = logs.filter(log => log.log_type === 'clock_in').length
-      const outCount = logs.filter(log => log.log_type === 'clock_out').length
-      if (inCount === 0 && outCount === 0) return 'not_started'
-      if (inCount === 1 && outCount === 0) return 'working'
-      if (inCount === 1 && outCount === 1) return 'finished'
+      const clockInCount = logs.filter(log => log.log_type === 'clock_in').length
+      const clockOutCount = logs.filter(log => log.log_type === 'clock_out').length
+
+      if (clockInCount === 0 && clockOutCount === 0) return 'not_started'
+      if (clockInCount === 1 && clockOutCount === 0) return 'working'
+      if (clockInCount === 1 && clockOutCount === 1) return 'finished'
       return 'invalid'
     }
 
@@ -247,16 +261,44 @@
     }
 
     function updateButtonsByState(state) {
-      if (state === 'not_started') { clockInBtn.disabled = false; clockOutBtn.disabled = true; todayStatusEl.textContent = '未出勤'; return }
-      if (state === 'working') { clockInBtn.disabled = true; clockOutBtn.disabled = false; todayStatusEl.textContent = '出勤中（退勤待ち）'; return }
-      if (state === 'finished') { clockInBtn.disabled = true; clockOutBtn.disabled = true; todayStatusEl.textContent = '本日の打刻完了'; return }
-      if (state === 'invalid') { clockInBtn.disabled = true; clockOutBtn.disabled = true; todayStatusEl.textContent = '打刻異常あり（管理者確認）'; return }
-      clockInBtn.disabled = true; clockOutBtn.disabled = true; todayStatusEl.textContent = '打刻状態を確認してください'
+      if (state === 'not_started') {
+        clockInBtn.disabled = false
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '未出勤'
+        return
+      }
+
+      if (state === 'working') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = false
+        todayStatusEl.textContent = '出勤中（退勤待ち）'
+        return
+      }
+
+      if (state === 'finished') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '本日の打刻完了'
+        return
+      }
+
+      if (state === 'invalid') {
+        clockInBtn.disabled = true
+        clockOutBtn.disabled = true
+        todayStatusEl.textContent = '打刻異常あり（管理者確認）'
+        return
+      }
+
+      clockInBtn.disabled = true
+      clockOutBtn.disabled = true
+      todayStatusEl.textContent = '打刻状態を確認してください'
     }
 
     async function renderHistory(employeeId) {
       historyListEl.innerHTML = ''
+
       const logs = await getTodayLogs(employeeId)
+
       if (logs.length === 0) {
         historyListEl.innerHTML = '<li>今日の履歴はありません</li>'
       } else {
@@ -267,13 +309,16 @@
           historyListEl.appendChild(li)
         })
       }
+
       const state = getAttendanceState(logs)
       updateButtonsByState(state)
+
       return logs
     }
 
     async function refreshEmployeeStatus() {
       const code = employeeCodeInput.value.trim()
+
       if (!code) {
         messageEl.innerText = '社員番号を入力してください'
         todayStatusEl.textContent = '社員番号未入力'
@@ -282,67 +327,78 @@
         historyListEl.innerHTML = ''
         return null
       }
+
       const employee = await getEmployee(code)
       await renderHistory(employee.id)
       return employee
-    }
-
-    async function applyRoleView() {
-      try {
-        const code = employeeCodeInput.value.trim()
-        if (!code) throw new Error('社員番号を入力してください')
-        currentUser = await getEmployee(code)
-        const roleLabel = currentUser.role === 'manager' ? '管理者' : currentUser.role === 'leader' ? '部署長' : '一般社員'
-        roleBannerEl.textContent = `${currentUser.name}さん / 役割: ${roleLabel} / 部門: ${currentUser.department}`
-
-        document.getElementById('allStatusSection').classList.toggle('hidden', !(isManager() || isLeader()))
-        document.getElementById('monthlySection').classList.toggle('hidden', !(isManager() || isLeader()))
-        document.getElementById('requestSection').classList.toggle('hidden', !canApprove())
-        document.getElementById('employeeSection').classList.toggle('hidden', !isManager())
-        document.getElementById('allStatusBtn').classList.toggle('hidden', !(isManager() || isLeader()))
-
-        messageEl.innerText = '権限表示を更新しました'
-        if (isManager()) await loadEmployees()
-      } catch (e) {
-        currentUser = null
-        roleBannerEl.textContent = `権限読込エラー: ${e.message}`
-        document.getElementById('allStatusSection').classList.add('hidden')
-        document.getElementById('monthlySection').classList.add('hidden')
-        document.getElementById('requestSection').classList.add('hidden')
-        document.getElementById('employeeSection').classList.add('hidden')
-        document.getElementById('allStatusBtn').classList.add('hidden')
-        messageEl.innerText = e.message
-      }
     }
 
     async function clockIn() {
       try {
         const employee = await refreshEmployeeStatus()
         if (!employee) return
+
         const logs = await getTodayLogs(employee.id)
         const state = getAttendanceState(logs)
-        if (logs.some(log => log.log_type === 'clock_in')) { messageEl.innerText = '今日はすでに出勤済みです'; updateButtonsByState(state); return }
-        if (state !== 'not_started') { messageEl.innerText = '今日はすでに打刻が進んでいます'; updateButtonsByState(state); return }
+
+        if (logs.some(log => log.log_type === 'clock_in')) {
+          messageEl.innerText = '今日はすでに出勤済みです'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state !== 'not_started') {
+          messageEl.innerText = '今日はすでに打刻が進んでいます'
+          updateButtonsByState(state)
+          return
+        }
+
         await saveLog(employee.id, 'clock_in')
         messageEl.innerText = `${employee.name}さんを出勤登録しました`
         await renderHistory(employee.id)
-      } catch (e) { messageEl.innerText = e.message }
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
     }
 
     async function clockOut() {
       try {
         const employee = await refreshEmployeeStatus()
         if (!employee) return
+
         const logs = await getTodayLogs(employee.id)
         const state = getAttendanceState(logs)
-        if (state === 'not_started') { messageEl.innerText = '先に出勤打刻をしてください'; updateButtonsByState(state); return }
-        if (state === 'finished') { messageEl.innerText = '今日はすでに退勤まで完了しています'; updateButtonsByState(state); return }
-        if (state === 'invalid') { messageEl.innerText = '打刻異常があるため管理者確認が必要です'; updateButtonsByState(state); return }
-        if (state !== 'working') { messageEl.innerText = '打刻状態を確認してください'; updateButtonsByState(state); return }
+
+        if (state === 'not_started') {
+          messageEl.innerText = '先に出勤打刻をしてください'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state === 'finished') {
+          messageEl.innerText = '今日はすでに退勤まで完了しています'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state === 'invalid') {
+          messageEl.innerText = '打刻異常があるため管理者確認が必要です'
+          updateButtonsByState(state)
+          return
+        }
+
+        if (state !== 'working') {
+          messageEl.innerText = '打刻状態を確認してください'
+          updateButtonsByState(state)
+          return
+        }
+
         await saveLog(employee.id, 'clock_out')
         messageEl.innerText = `${employee.name}さんを退勤登録しました`
         await renderHistory(employee.id)
-      } catch (e) { messageEl.innerText = e.message }
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
     }
 
     async function loadHistory() {
@@ -350,388 +406,54 @@
         const employee = await refreshEmployeeStatus()
         if (!employee) return
         messageEl.innerText = `${employee.name}さんの今日の履歴を表示しています`
-      } catch (e) { messageEl.innerText = e.message }
+      } catch (e) {
+        messageEl.innerText = e.message
+      }
     }
 
     async function loadAllStatus() {
       try {
-        if (!currentUser) throw new Error('先に権限読込をしてください')
-        if (!(isManager() || isLeader())) throw new Error('この権限では全員状況を見られません')
-        messageEl.innerText = '状況を読み込み中です...'
+        if (!isAdminUser) {
+          messageEl.innerText = 'この機能は管理者のみ利用できます'
+          allStatusListEl.innerHTML = '<li>管理者のみ表示できます</li>'
+          return
+        }
+
+        messageEl.innerText = '全社員の状況を読み込み中です...'
         allStatusListEl.innerHTML = '<li>読み込み中...</li>'
+
         const { data: employees, error: empError } = await supabase
           .from('employees')
-          .select('id, name, employee_code, is_active, department')
+          .select('id, name, employee_code')
+
         if (empError) throw empError
-        let targetEmployees = (employees || []).filter(emp => emp.is_active !== false)
-        if (isLeader()) targetEmployees = targetEmployees.filter(emp => emp.department === currentUser.department)
+
         allStatusListEl.innerHTML = ''
-        for (const emp of targetEmployees.sort((a,b)=>String(a.employee_code).localeCompare(String(b.employee_code),'ja'))) {
+
+        if (!employees || employees.length === 0) {
+          allStatusListEl.innerHTML = '<li>社員データがありません</li>'
+          messageEl.innerText = '社員データがありません'
+          return
+        }
+
+        const sortedEmployees = [...employees].sort((a, b) =>
+          String(a.employee_code).localeCompare(String(b.employee_code), 'ja')
+        )
+
+        for (const emp of sortedEmployees) {
           const logs = await getTodayLogs(emp.id)
           const state = getAttendanceState(logs)
+
           const li = document.createElement('li')
           li.className = getStateClass(state)
           li.textContent = `${emp.employee_code} ${emp.name}　→　${getStateLabel(state)}`
           allStatusListEl.appendChild(li)
         }
-        messageEl.innerText = `${isManager() ? '全社員' : '自部署'}の今日の状況を表示しています（${targetEmployees.length}名）`
+
+        messageEl.innerText = `全社員の今日の状況を表示しています（${sortedEmployees.length}名）`
       } catch (e) {
-        allStatusListEl.innerHTML = `<div class="request-card">エラー: ${e.message}</div>`
+        allStatusListEl.innerHTML = `<li>エラー: ${e.message}</li>`
         messageEl.innerText = `エラー: ${e.message}`
-      }
-    }
-
-    async function loadMonthly() {
-      try {
-        if (!currentUser) throw new Error('先に権限読込をしてください')
-        if (!(isManager() || isLeader())) throw new Error('この権限では月次一覧を見られません')
-        const month = document.getElementById('monthPicker').value
-        if (!month) throw new Error('月を選択してください')
-        const start = `${month}-01T00:00:00+09:00`
-        const end = `${month}-31T23:59:59+09:00`
-        const { data: logs, error } = await supabase
-          .from('attendance_logs')
-          .select(`employee_id,log_type,logged_at,employees(name,employee_code,department)`)
-          .gte('logged_at', start)
-          .lte('logged_at', end)
-          .order('logged_at', { ascending: true })
-        if (error) throw error
-
-        let grouped = {}
-        ;(logs || []).forEach(log => {
-          const emp = Array.isArray(log.employees) ? log.employees[0] : log.employees
-          if (!emp) return
-          if (isLeader() && emp.department !== currentUser.department) return
-          const key = emp.employee_code
-          if (!grouped[key]) grouped[key] = { name: emp.name, code: emp.employee_code, logs: [] }
-          grouped[key].logs.push(log)
-        })
-
-        const container = document.getElementById('monthlyList')
-        container.innerHTML = ''
-        const rows = Object.values(grouped)
-        if (rows.length === 0) {
-          container.innerHTML = '<div class="employee-card">対象データがありません</div>'
-          messageEl.innerText = '月次データがありません'
-          return
-        }
-
-        rows.forEach(emp => {
-          let html = `<div class="employee-card"><strong>${emp.code} ${emp.name}</strong><br>`
-          let totalMinutes = 0
-          for (let i=0; i<emp.logs.length; i+=2) {
-            const inLog = emp.logs[i]
-            const outLog = emp.logs[i+1]
-            if (!inLog || !outLog) continue
-            let diff = (new Date(outLog.logged_at) - new Date(inLog.logged_at)) / 1000 / 60
-            diff -= 60
-            if (diff < 0) diff = 0
-            totalMinutes += diff
-            html += `${new Date(inLog.logged_at).toLocaleDateString('ja-JP')} ${formatJapanTime(inLog.logged_at)} - ${formatJapanTime(outLog.logged_at)}<br>`
-          }
-          html += `<strong>合計：${(totalMinutes/60).toFixed(1)}時間</strong></div>`
-          container.innerHTML += html
-        })
-        messageEl.innerText = '月次一覧を表示しました'
-      } catch (e) {
-        document.getElementById('monthlyList').innerHTML = `<div class="employee-card">エラー: ${e.message}</div>`
-        messageEl.innerText = e.message
-      }
-    }
-
-    async function submitCorrectionRequest() {
-      try {
-        const code = employeeCodeInput.value.trim()
-        const targetDate = document.getElementById('requestDate').value
-        const requestedClockIn = document.getElementById('requestClockIn').value
-        const requestedClockOut = document.getElementById('requestClockOut').value
-        const reason = document.getElementById('requestReason').value.trim()
-        if (!code) throw new Error('社員番号を入力してください')
-        if (!targetDate) throw new Error('対象日を入力してください')
-        if (!reason) throw new Error('理由を入力してください')
-        if (!requestedClockIn && !requestedClockOut) throw new Error('出勤時刻か退勤時刻のどちらかを入力してください')
-        const employee = await getEmployee(code)
-        const { error } = await supabase.from('correction_requests').insert([{
-          employee_id: employee.id,
-          target_date: targetDate,
-          requested_clock_in: requestedClockIn || null,
-          requested_clock_out: requestedClockOut || null,
-          reason: reason
-        }])
-        if (error) throw error
-        document.getElementById('requestDate').value = ''
-        document.getElementById('requestClockIn').value = ''
-        document.getElementById('requestClockOut').value = ''
-        document.getElementById('requestReason').value = ''
-        messageEl.innerText = `${employee.name}さんの修正申請を送信しました`
-        alert(`${employee.name}さんの修正申請を送信しました`)
-      } catch (e) {
-        const msg = `修正申請エラー: ${e.message || e}`
-        messageEl.innerText = msg
-        alert(msg)
-      }
-    }
-
-    async function loadCorrectionRequests() {
-      try {
-        if (!currentUser) throw new Error('先に権限読込をしてください')
-        if (!canApprove()) throw new Error('この権限では承認一覧を見られません')
-        requestListEl.innerHTML = '<div class="request-card">読み込み中...</div>'
-        const { data, error } = await supabase
-          .from('correction_requests')
-          .select(`id,target_date,requested_clock_in,requested_clock_out,reason,status,created_at,employee_id,employees(id,name,employee_code,department)`)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true })
-        if (error) throw error
-
-        let rows = data || []
-        if (isLeader()) {
-          rows = rows.filter(req => {
-            const emp = Array.isArray(req.employees) ? req.employees[0] : req.employees
-            return emp && emp.department === currentUser.department
-          })
-        }
-
-        requestListEl.innerHTML = ''
-        if (rows.length === 0) {
-          requestListEl.innerHTML = '<div class="request-card">未処理の申請はありません</div>'
-          messageEl.innerText = '未処理の修正申請はありません'
-          return
-        }
-
-        rows.forEach(req => {
-          const emp = Array.isArray(req.employees) ? req.employees[0] : req.employees
-          const employeeLabel = emp ? `${emp.employee_code} ${emp.name}` : '社員情報なし'
-          const card = document.createElement('div')
-          card.className = 'request-card'
-          card.innerHTML = `
-            <div><strong>申請者：</strong>${employeeLabel}</div>
-            <div><strong>対象日：</strong>${req.target_date}</div>
-            <div><strong>修正後 出勤：</strong>${req.requested_clock_in || '-'}</div>
-            <div><strong>修正後 退勤：</strong>${req.requested_clock_out || '-'}</div>
-            <div><strong>理由：</strong>${req.reason}</div>
-            <div><strong>状態：</strong>${req.status}</div>
-            <div class="request-actions">
-              <button onclick="approveCorrectionRequest('${req.id}')">承認</button>
-              <button onclick="rejectCorrectionRequest('${req.id}')">却下</button>
-            </div>`
-          requestListEl.appendChild(card)
-        })
-        messageEl.innerText = `未処理の修正申請を表示しています（${rows.length}件）`
-      } catch (e) {
-        requestListEl.innerHTML = `<div class="request-card">エラー: ${e.message}</div>`
-        messageEl.innerText = `エラー: ${e.message}`
-      }
-    }
-
-    async function approveCorrectionRequest(requestId) {
-      try {
-        if (!currentUser) throw new Error('先に権限読込をしてください')
-        if (!canApprove()) throw new Error('この権限では承認できません')
-        const { data: req, error: reqError } = await supabase
-          .from('correction_requests')
-          .select(`*,employees(id,department)`)
-          .eq('id', requestId)
-          .single()
-        if (reqError) throw reqError
-        if (!req) throw new Error('申請が見つかりません')
-        if (req.status !== 'pending') throw new Error('すでに処理済みです')
-
-        const reqEmp = Array.isArray(req.employees) ? req.employees[0] : req.employees
-        if (isLeader() && reqEmp?.department !== currentUser.department) throw new Error('自部署以外の申請は承認できません')
-
-        const range = toJstDateRange(req.target_date)
-        const { error: deleteError } = await supabase
-          .from('attendance_logs')
-          .delete()
-          .eq('employee_id', req.employee_id)
-          .gte('logged_at', range.start)
-          .lte('logged_at', range.end)
-        if (deleteError) throw deleteError
-
-        const newLogs = []
-        if (req.requested_clock_in) newLogs.push({ employee_id: req.employee_id, log_type: 'clock_in', logged_at: toJstDateTime(req.target_date, req.requested_clock_in) })
-        if (req.requested_clock_out) newLogs.push({ employee_id: req.employee_id, log_type: 'clock_out', logged_at: toJstDateTime(req.target_date, req.requested_clock_out) })
-
-        if (newLogs.length > 0) {
-          const { error: insertError } = await supabase.from('attendance_logs').insert(newLogs)
-          if (insertError) throw insertError
-        }
-
-        const { error: updateError } = await supabase
-          .from('correction_requests')
-          .update({ status: 'approved', reviewed_at: new Date().toISOString() })
-          .eq('id', requestId)
-        if (updateError) throw updateError
-
-        messageEl.innerText = '修正申請を承認しました'
-        await loadCorrectionRequests()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
-      }
-    }
-
-    async function rejectCorrectionRequest(requestId) {
-      try {
-        if (!currentUser) throw new Error('先に権限読込をしてください')
-        if (!canApprove()) throw new Error('この権限では却下できません')
-        const { data: req, error: reqError } = await supabase
-          .from('correction_requests')
-          .select(`id,employees(department)`)
-          .eq('id', requestId)
-          .single()
-        if (reqError) throw reqError
-
-        const reqEmp = Array.isArray(req.employees) ? req.employees[0] : req.employees
-        if (isLeader() && reqEmp?.department !== currentUser.department) throw new Error('自部署以外の申請は却下できません')
-
-        const { error } = await supabase
-          .from('correction_requests')
-          .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
-          .eq('id', requestId)
-        if (error) throw error
-
-        messageEl.innerText = '修正申請を却下しました'
-        await loadCorrectionRequests()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
-      }
-    }
-
-    function resetEmployeeForm() {
-      document.getElementById('editingEmployeeId').value = ''
-      document.getElementById('manageEmployeeCode').value = ''
-      document.getElementById('manageEmployeeName').value = ''
-      document.getElementById('manageEmployeeDepartment').value = ''
-      document.getElementById('manageEmployeeRole').value = 'employee'
-    }
-
-    async function saveEmployee() {
-      try {
-        if (!isManager()) throw new Error('社員管理は管理者のみ利用できます')
-        const editingId = document.getElementById('editingEmployeeId').value
-        const employeeCode = document.getElementById('manageEmployeeCode').value.trim()
-        const name = document.getElementById('manageEmployeeName').value.trim()
-        const department = document.getElementById('manageEmployeeDepartment').value.trim()
-        const role = document.getElementById('manageEmployeeRole').value
-        if (!employeeCode) throw new Error('社員番号を入力してください')
-        if (!name) throw new Error('名前を入力してください')
-        if (!department) throw new Error('部門を入力してください')
-        if (!role) throw new Error('役割を選択してください')
-
-        if (editingId) {
-          const { error } = await supabase.from('employees').update({ employee_code: employeeCode, name, department, role }).eq('id', editingId)
-          if (error) throw error
-          messageEl.innerText = '社員情報を更新しました'
-        } else {
-          const { error } = await supabase.from('employees').insert([{ employee_code: employeeCode, name, department, role, is_active: true }])
-          if (error) throw error
-          messageEl.innerText = '社員を登録しました'
-        }
-        resetEmployeeForm()
-        await loadEmployees()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
-      }
-    }
-
-    async function loadEmployees() {
-      try {
-        if (!isManager()) throw new Error('社員管理は管理者のみ利用できます')
-        employeeListEl.innerHTML = '<div class="employee-card">読み込み中...</div>'
-        const { data, error } = await supabase
-          .from('employees')
-          .select('id, employee_code, name, department, role, is_active')
-          .order('employee_code', { ascending: true })
-        if (error) throw error
-
-        employeeListEl.innerHTML = ''
-        if (!data || data.length === 0) {
-          employeeListEl.innerHTML = '<div class="employee-card">社員データがありません</div>'
-          return
-        }
-
-        for (const emp of data) {
-          const hasHistory = await hasEmployeeHistory(emp.id)
-          const card = document.createElement('div')
-          card.className = 'employee-card' + (emp.is_active === false ? ' employee-inactive' : '')
-          const badgeClass = emp.is_active === false ? 'badge badge-inactive' : 'badge badge-active'
-          const badgeText = emp.is_active === false ? '無効' : '有効'
-          card.innerHTML = `
-            <div><strong>${emp.employee_code} ${emp.name}</strong><span class="${badgeClass}">${badgeText}</span></div>
-            <div>部門：${emp.department}</div>
-            <div>役割：${emp.role}</div>
-            <div>履歴：${hasHistory ? 'あり' : 'なし'}</div>
-            <div class="employee-actions">
-              <button onclick="editEmployee('${emp.id}', '${String(emp.employee_code).replace(/'/g, "\\'")}', '${String(emp.name).replace(/'/g, "\\'")}', '${String(emp.department).replace(/'/g, "\\'")}', '${emp.role}')">編集</button>
-              ${emp.is_active === false ? `<button onclick="reactivateEmployee('${emp.id}')">再有効化</button>` : `<button onclick="deactivateEmployee('${emp.id}')">無効化</button>`}
-              ${hasHistory ? `<button disabled title="勤怠履歴があるため削除できません">削除不可</button>` : `<button onclick="deleteEmployee('${emp.id}')">削除</button>`}
-            </div>`
-          employeeListEl.appendChild(card)
-        }
-        messageEl.innerText = '社員一覧を表示しています'
-      } catch (e) {
-        employeeListEl.innerHTML = `<div class="employee-card">エラー: ${e.message}</div>`
-        messageEl.innerText = `エラー: ${e.message}`
-      }
-    }
-
-    function editEmployee(id, code, name, department, role) {
-      document.getElementById('editingEmployeeId').value = id
-      document.getElementById('manageEmployeeCode').value = code
-      document.getElementById('manageEmployeeName').value = name
-      document.getElementById('manageEmployeeDepartment').value = department
-      document.getElementById('manageEmployeeRole').value = role
-      messageEl.innerText = '社員情報を編集中です'
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-    }
-
-    async function deactivateEmployee(id) {
-      try {
-        if (!isManager()) throw new Error('社員無効化は管理者のみ利用できます')
-        if (!confirm('この社員を無効化します。よろしいですか？')) return
-        const { error } = await supabase.from('employees').update({ is_active: false }).eq('id', id)
-        if (error) throw error
-        messageEl.innerText = '社員を無効化しました'
-        await loadEmployees()
-        if (!document.getElementById('allStatusSection').classList.contains('hidden')) await loadAllStatus()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
-      }
-    }
-
-    async function reactivateEmployee(id) {
-      try {
-        if (!isManager()) throw new Error('社員再有効化は管理者のみ利用できます')
-        const { error } = await supabase.from('employees').update({ is_active: true }).eq('id', id)
-        if (error) throw error
-        messageEl.innerText = '社員を再有効化しました'
-        await loadEmployees()
-        if (!document.getElementById('allStatusSection').classList.contains('hidden')) await loadAllStatus()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
-      }
-    }
-
-    async function deleteEmployee(id) {
-      try {
-        if (!isManager()) throw new Error('社員削除は管理者のみ利用できます')
-        const historyExists = await hasEmployeeHistory(id)
-        if (historyExists) { alert('この社員には勤怠履歴があるため削除できません。無効化を使ってください。'); return }
-        if (!confirm('この社員を削除します。よろしいですか？')) return
-        const { error } = await supabase.from('employees').delete().eq('id', id)
-        if (error) throw error
-        messageEl.innerText = '社員を削除しました'
-        await loadEmployees()
-        if (!document.getElementById('allStatusSection').classList.contains('hidden')) await loadAllStatus()
-      } catch (e) {
-        messageEl.innerText = `エラー: ${e.message}`
-        alert(`エラー: ${e.message}`)
       }
     }
 
@@ -742,23 +464,12 @@
       clockOutBtn.disabled = false
     })
 
-    window.applyRoleView = applyRoleView
     window.clockIn = clockIn
     window.clockOut = clockOut
     window.loadHistory = loadHistory
     window.loadAllStatus = loadAllStatus
-    window.loadMonthly = loadMonthly
-    window.submitCorrectionRequest = submitCorrectionRequest
-    window.loadCorrectionRequests = loadCorrectionRequests
-    window.approveCorrectionRequest = approveCorrectionRequest
-    window.rejectCorrectionRequest = rejectCorrectionRequest
-    window.saveEmployee = saveEmployee
-    window.loadEmployees = loadEmployees
-    window.editEmployee = editEmployee
-    window.deactivateEmployee = deactivateEmployee
-    window.reactivateEmployee = reactivateEmployee
-    window.deleteEmployee = deleteEmployee
-    window.resetEmployeeForm = resetEmployeeForm
+
+    await checkAdminUI()
   </script>
 </body>
 </html>
